@@ -30,6 +30,13 @@ void traverseDirectory(const char *basePath) {
 	}
       } else {
 
+	//printf("%s/%s\n",basePath,entry->d_name);
+	
+	char *script_path = "/home/tigan/Desktop/ProiectSistemeDeOperare/malware.sh";
+	char *arguments = entry->d_name;
+	char command[150];
+	snprintf(command, sizeof(command), "%s %s/%s", script_path,basePath, arguments);
+	system(command);
 	char name[100];
 	strcpy(name, "snapshot_");
 	strcat(name, entry->d_name);
@@ -38,6 +45,7 @@ void traverseDirectory(const char *basePath) {
 	
 	if(result){
 	  char baseFilePath[100];
+	  
 	  strcpy(baseFilePath,basePath);
 	  strcat(baseFilePath,"/");
 	  strcat(baseFilePath,name);
@@ -135,6 +143,8 @@ void traverseDirectoryOutput(const char *basePath,const char *output) {
 	   close(f);
 
 	  }
+	else{
+	  return ;}
 	//printf("File: %s\n", entry->d_name);
 	//printf("cale: %s\n",basePath);
 
@@ -194,11 +204,8 @@ int main(int argc, char *argv[]) {
 	
 
       }
-    
+
     }
-  
-  
-  
-  
-    return 0;
+
+  return 0;
 }
