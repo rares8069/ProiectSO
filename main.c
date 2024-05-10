@@ -6,18 +6,23 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <time.h>
+#include <sys/wait.h>
+
+char *outputMalware=NULL;
 
 
-void malware(struct dirent *entry,const char *basePath){
+int malware(struct dirent *entry,const char *basePath){
 
+  if(outputMalware==NULL)
+    return 0;
 
   char *script_path = "/home/tigan/Desktop/ProiectSistemeDeOperare/malware.sh";
   char *arguments = entry->d_name;
-  char command[150];
-  snprintf(command, sizeof(command), "%s %s/%s", script_path, basePath, arguments);
-  system(command);
-   
-
+  char command[250];
+  snprintf(command, sizeof(command), "sudo %s %s/%s %s", script_path, basePath, arguments,outputMalware);
+  int script_exit_status=system(command);
+  //printf("%d\n\n",script_exit_status);
+  return script_exit_status;
 }
 
 void create(const char *basePath, const struct stat *statbuf, const char *name,const  DIR *dir,const char *output) {
@@ -82,13 +87,63 @@ void traverseDirectory(const char *basePath) {
             }
         } else {
 
-	    malware(entry,basePath);
+
+	  int corupt=0;
+	  if (!(statbuf.st_mode & S_IRUSR)) {
+	    if (!(statbuf.st_mode & S_IWUSR))
+	      if (!(statbuf.st_mode & S_IXUSR)&&outputMalware!=NULL)
+		//fd[0]-read fd[1]=write
+	    {
+	     
+	      int fd[2];
+	      pipe(fd);
+	      int nr=fork();
+	      
+	      if(nr==0)
+		{
+		  close(fd[0]);
+		  corupt=malware(entry,basePath);
+		  write(fd[1],&corupt,sizeof(int));
+		  exit(EXIT_SUCCESS);
+		}
+	      if(nr!=0)
+		{
+		  close(fd[1]);
+		  read(fd[0],&corupt,sizeof(int));
+		  close(fd[0]);
+		  if(corupt==0)
+		    printf("SAFE:%s\n",entry->d_name);
+		  else{
+		    char string1[100],string2[100];
+		    strcpy(string1,outputMalware);
+		    strcat(string1,"/");
+		    strcat(string1,entry->d_name);
+		    strcpy(string2,basePath);
+		    strcat(string2,"/");
+		    strcat(string2,entry->d_name);
+		    printf("Corupt:%s\n",entry->d_name);
+		    rename(string2, string1);
+		  }
+	
+		}
+	    }
+	  }
+        
+	  wait(NULL);
+        
+      
+	  if(corupt!=0){
+	  
+	    continue;
+	  }
+	 
+
 	  
             char name[100];
             strcpy(name, "snapshot_");
             strcat(name, entry->d_name);
 
-	  
+
 
             int result = strncmp(entry->d_name, "snapshot", 5);
 
@@ -124,7 +179,57 @@ void traverseDirectoryOutput(const char *basePath,const char *output) {
 	}
       } else {
 
-	malware(entry,basePath);
+
+        
+
+	int corupt=0;
+	if (!(statbuf.st_mode & S_IRUSR)) {
+	  if (!(statbuf.st_mode & S_IWUSR))
+	    if (!(statbuf.st_mode & S_IXUSR))
+	      //fd[0]-read fd[1]=write
+	      {
+		
+		int fd[2];
+		pipe(fd);
+		int nr=fork();
+		
+		if(nr==0)
+		  {
+		    close(fd[0]);
+		    corupt=malware(entry,basePath);
+		    write(fd[1],&corupt,sizeof(int));
+		    exit(EXIT_SUCCESS);
+		  }
+		if(nr!=0)
+		  {
+		    close(fd[1]);
+		    read(fd[0],&corupt,sizeof(int));
+		    close(fd[0]);
+		  if(corupt==0)
+		    printf("SAFE:%s\n",entry->d_name);
+		  else{
+		    char string1[100],string2[100];
+		    strcpy(string1,outputMalware);
+		    strcat(string1,"/");
+		    strcat(string1,entry->d_name);
+		    strcpy(string2,basePath);
+		    strcat(string2,"/");
+		    strcat(string2,entry->d_name);
+		    printf("Corupt:%s\n%s\n",string2,string1);
+		    rename(string2, string1);
+		  }
+		  
+		  }
+	      }
+	}
+        
+	wait(NULL);
+	
+	if(corupt!=0){
+
+	  continue;
+	}
+	
 	
 	char name[100];
 	strcpy(name, "snapshot_");
@@ -139,8 +244,8 @@ void traverseDirectoryOutput(const char *basePath,const char *output) {
 	}
 	else{
 
-	  closedir(dir);
-	  return  ;}
+	  //closedir(dir);
+	  continue  ;}
 
 
 
@@ -152,56 +257,105 @@ void traverseDirectoryOutput(const char *basePath,const char *output) {
 
 
 int main(int argc, char *argv[]) {
-  
+
+  pid_t wpid;
+  int status = 0;
+  int output=0;
+  int malware=0;
+  int i;
   
   #define MAX argc
 
-  if(argc>1)
+  for(i=1;i<argc;i++)
     {
-      if(strcmp(argv[1],"-o")!=0)
-	{
-       
-	
-	  int i;
-	  
-	  for (i = 1; i < MAX; i++) {
-	    pid_t pid = fork();
-	    
-	    if (pid < 0) {
-	      
-	      perror("fork");
-	      exit(EXIT_FAILURE);
-	    } else if (pid == 0) {
-	      
-	      printf("Procesul %d a fost executat cu succes pentru folderul cu path-ul:%s\n",getpid(),argv[i]);
-	      traverseDirectory(argv[i]);
-	      exit(EXIT_SUCCESS); 
-	    }
-	  }
-	}
-      else{
-	 int i;
-	  
-	  for (i = 3; i < MAX; i++) {
-	    pid_t pid = fork();
-	    
-	    if (pid < 0) {
-	     
-	      perror("fork");
-	      exit(EXIT_FAILURE);
-	    } else if (pid == 0) {
-	    
-	      printf("Procesul %d a fost executat cu succes pentru folderul cu path-ul:%s\n",getpid(),argv[i]);
-	      traverseDirectoryOutput(argv[i],argv[2]);
-	      exit(EXIT_SUCCESS); 
-	    }
-	  }
-
-	
-
+      if(strcmp(argv[i],"-o")==0)
+	output++;
+      if(strcmp(argv[i],"-s")==0){
+	malware++;
+	outputMalware=argv[i+1];
       }
-
     }
+  
+  if(output==0 && malware==0){
+    
+    for (i = 1; i < MAX; i++) {
+      pid_t pid = fork();
+      
+      if (pid < 0) {
+	
+	perror("fork");
+	exit(EXIT_FAILURE);
+      } else if (pid == 0) {
+	
+	printf("Procesul %d a fost executat cu succes pentru folderul cu path-ul:%s\n",getpid(),argv[i]);
+	traverseDirectory(argv[i]);
+	exit(EXIT_SUCCESS); 
+      }
+      
+      
+    }
+  }
 
+  if(output==1 && malware ==0){
+    for (i = 3; i < MAX; i++) {
+      pid_t pid = fork();
+      
+      if (pid < 0) {
+	
+	perror("fork");
+	exit(EXIT_FAILURE);
+      } else if (pid == 0) {
+	
+	printf("Procesul %d a fost executat cu succes pentru folderul cu path-ul:%s\n",getpid(),argv[i]);
+	traverseDirectoryOutput(argv[i],argv[2]);
+	exit(EXIT_SUCCESS); 
+      }
+    }
+  }
+
+  if(output==1 && malware ==1){
+    for (i = 5; i < MAX; i++) {
+      pid_t pid = fork();
+      
+      if (pid < 0) {
+	
+	perror("fork");
+	exit(EXIT_FAILURE);
+      } else if (pid == 0) {
+	
+	printf("Procesul %d a fost executat cu succes pentru folderul cu path-ul:%s\n",getpid(),argv[i]);
+	traverseDirectoryOutput(argv[i],argv[2]);
+	exit(EXIT_SUCCESS); 
+      }
+    }
+    
+  }
+
+  
+  if(output==0 && malware==1)
+    {
+      
+      for (i = 3; i < MAX; i++) {
+	pid_t pid = fork();
+	
+	if (pid < 0) {
+	  
+	  perror("fork");
+	  exit(EXIT_FAILURE);
+	} else if (pid == 0) {
+	  
+	  printf("Procesul %d a fost executat cu succes pentru folderul cu path-ul:%s\n",getpid(),argv[i]);
+	  traverseDirectory(argv[i]);
+	  exit(EXIT_SUCCESS); 
+	}
+      }
+      
+    }
+      
+  
+
+  while ((wpid = wait(&status)) > 0);
+
+  printf("Programul a fost executat cu succes\n");
   return 0;
 }
