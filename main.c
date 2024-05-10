@@ -47,8 +47,16 @@ void create(const char *basePath, const struct stat *statbuf, const char *name,c
         exit(-1);
 	}
 
-    write(f, "New_Snapshot", 12);
-    write(f,"\ndimensiune ",12);
+    write(f, "New_Snapshot data si ora:", 25);
+    time_t current_time;
+    struct tm *timeinfo;
+    char time_str[80];
+    time(&current_time);
+    timeinfo = localtime(&current_time);
+    strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", timeinfo);
+    write(f, time_str, strlen(time_str));
+    
+    write(f,"\ndimensiune:",12);
     char fileSizeStr[20];
     sprintf(fileSizeStr, "%lld", (long long)statbuf->st_size);
     write(f,fileSizeStr,strlen(fileSizeStr));
@@ -61,7 +69,25 @@ void create(const char *basePath, const struct stat *statbuf, const char *name,c
     strftime(modTimeStr, sizeof(modTimeStr), "%Y-%m-%d %H:%M:%S", localtime(&modTime.tv_sec));
     write(f,modTimeStr,strlen(modTimeStr));
     write(f,"\n",1);
+
+    char inode_str[70]; 
+    snprintf(inode_str, sizeof(inode_str)+12, "Numar Inode:%lu\n", (unsigned long)statbuf->st_ino);
     
+    
+    write(f, inode_str, strlen(inode_str));
+    char permissions[21];
+    snprintf(permissions, sizeof(permissions), "Permisiuni:%c%c%c%c%c%c%c%c%c",
+    (statbuf->st_mode & S_IRUSR) ? 'r' : '-',
+    (statbuf->st_mode & S_IWUSR) ? 'w' : '-',
+    (statbuf->st_mode & S_IXUSR) ? 'x' : '-',
+    (statbuf->st_mode & S_IRGRP) ? 'r' : '-',
+    (statbuf->st_mode & S_IWGRP) ? 'w' : '-',
+    (statbuf->st_mode & S_IXGRP) ? 'x' : '-',
+    (statbuf->st_mode & S_IROTH) ? 'r' : '-',
+    (statbuf->st_mode & S_IWOTH) ? 'w' : '-',
+    (statbuf->st_mode & S_IXOTH) ? 'x' : '-');
+    write(f, permissions, sizeof(permissions)-1);
+    write(f,"\n",1);
     close(f);
     //closedir(dir);
 }
@@ -215,7 +241,7 @@ void traverseDirectoryOutput(const char *basePath,const char *output) {
 		    strcpy(string2,basePath);
 		    strcat(string2,"/");
 		    strcat(string2,entry->d_name);
-		    printf("Corupt:%s\n%s\n",string2,string1);
+		    printf("Corupt:%s\n",entry->d_name);
 		    rename(string2, string1);
 		  }
 		  
