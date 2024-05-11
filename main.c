@@ -9,7 +9,7 @@
 #include <sys/wait.h>
 
 char *outputMalware=NULL;
-
+int c;
 
 int malware(struct dirent *entry,const char *basePath){
 
@@ -21,7 +21,6 @@ int malware(struct dirent *entry,const char *basePath){
   char command[250];
   snprintf(command, sizeof(command), "sudo %s %s/%s %s", script_path, basePath, arguments,outputMalware);
   int script_exit_status=system(command);
-  //printf("%d\n\n",script_exit_status);
   return script_exit_status;
 }
 
@@ -130,10 +129,13 @@ void traverseDirectory(const char *basePath) {
 		  close(fd[0]);
 		  corupt=malware(entry,basePath);
 		  write(fd[1],&corupt,sizeof(int));
+		  close(fd[1]);
 		  exit(EXIT_SUCCESS);
 		}
 	      if(nr!=0)
 		{
+		  wait(NULL);
+        
 		  close(fd[1]);
 		  read(fd[0],&corupt,sizeof(int));
 		  close(fd[0]);
@@ -149,6 +151,7 @@ void traverseDirectory(const char *basePath) {
 		    strcat(string2,entry->d_name);
 		    printf("Corupt:%s\n",entry->d_name);
 		    rename(string2, string1);
+		    c++;
 		  }
 	
 		}
@@ -207,30 +210,32 @@ void traverseDirectoryOutput(const char *basePath,const char *output) {
 
 
         
-
-	int corupt=0;
-	if (!(statbuf.st_mode & S_IRUSR)) {
-	  if (!(statbuf.st_mode & S_IWUSR))
-	    if (!(statbuf.st_mode & S_IXUSR))
-	      //fd[0]-read fd[1]=write
-	      {
-		
-		int fd[2];
-		pipe(fd);
-		int nr=fork();
-		
-		if(nr==0)
-		  {
-		    close(fd[0]);
-		    corupt=malware(entry,basePath);
-		    write(fd[1],&corupt,sizeof(int));
-		    exit(EXIT_SUCCESS);
-		  }
-		if(nr!=0)
-		  {
-		    close(fd[1]);
-		    read(fd[0],&corupt,sizeof(int));
-		    close(fd[0]);
+ int corupt=0;
+	  if (!(statbuf.st_mode & S_IRUSR)) {
+	    if (!(statbuf.st_mode & S_IWUSR))
+	      if (!(statbuf.st_mode & S_IXUSR)&&outputMalware!=NULL)
+		//fd[0]-read fd[1]=write
+	    {
+	     
+	      int fd[2];
+	      pipe(fd);
+	      int nr=fork();
+	      
+	      if(nr==0)
+		{
+		  close(fd[0]);
+		  corupt=malware(entry,basePath);
+		  write(fd[1],&corupt,sizeof(int));
+		  close(fd[1]);
+		  exit(EXIT_SUCCESS);
+		}
+	      if(nr!=0)
+		{
+		  wait(NULL);
+        
+		  close(fd[1]);
+		  read(fd[0],&corupt,sizeof(int));
+		  close(fd[0]);
 		  if(corupt==0)
 		    printf("SAFE:%s\n",entry->d_name);
 		  else{
@@ -243,14 +248,15 @@ void traverseDirectoryOutput(const char *basePath,const char *output) {
 		    strcat(string2,entry->d_name);
 		    printf("Corupt:%s\n",entry->d_name);
 		    rename(string2, string1);
+		    c++;
 		  }
-		  
-		  }
-	      }
-	}
-        
-	wait(NULL);
 	
+		}
+	    }
+	  }
+        
+	  wait(NULL);
+        
 	if(corupt!=0){
 
 	  continue;
@@ -340,6 +346,7 @@ int main(int argc, char *argv[]) {
   }
 
   if(output==1 && malware ==1){
+    c=0;
     for (i = 5; i < MAX; i++) {
       pid_t pid = fork();
       
@@ -351,6 +358,7 @@ int main(int argc, char *argv[]) {
 	
 	printf("Procesul %d a fost executat cu succes pentru folderul cu path-ul:%s\n",getpid(),argv[i]);
 	traverseDirectoryOutput(argv[i],argv[2]);
+	printf("Procesul %d a avut %d fisiere malitioase\n",getpid(),c);
 	exit(EXIT_SUCCESS); 
       }
     }
@@ -360,7 +368,7 @@ int main(int argc, char *argv[]) {
   
   if(output==0 && malware==1)
     {
-      
+      c=0;
       for (i = 3; i < MAX; i++) {
 	pid_t pid = fork();
 	
@@ -372,6 +380,7 @@ int main(int argc, char *argv[]) {
 	  
 	  printf("Procesul %d a fost executat cu succes pentru folderul cu path-ul:%s\n",getpid(),argv[i]);
 	  traverseDirectory(argv[i]);
+	  printf("Procesul %d a avut %d fisiere malitioase\n",getpid(),c);
 	  exit(EXIT_SUCCESS); 
 	}
       }
